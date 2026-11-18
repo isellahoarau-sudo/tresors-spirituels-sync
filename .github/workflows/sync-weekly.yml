@@ -18,7 +18,8 @@ concurrency:
 
 jobs:
   synchronize-and-publish:
-    runs-on: ubuntu-latest
+    # Playwright 1.60 does not support Ubuntu 26.04 yet; pin the compatible runner.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
       name: github-pages
@@ -48,7 +49,7 @@ jobs:
       - name: Configurer GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Emballer l’application et le catalogue
+      - name: Emballer le catalogue
         uses: actions/upload-pages-artifact@v4
         with:
           path: _site
