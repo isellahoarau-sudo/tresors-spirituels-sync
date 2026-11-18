@@ -1,0 +1,58 @@
+name: Synchronisation hebdomadaire Webador
+
+on:
+  schedule:
+    # 02:20 le samedi en Nouvelle-Calédonie, après les publications du vendredi.
+    - cron: '20 2 * * 6'
+      timezone: Pacific/Noumea
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publication-github-pages
+  cancel-in-progress: true
+
+jobs:
+  synchronize-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Récupérer le projet
+        uses: actions/checkout@v7
+
+      - name: Installer Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Installer le navigateur nécessaire à Webador
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Synchroniser les articles publics
+        run: python sync.py --max-articles 30
+
+      - name: Préparer le catalogue public pour l’application
+        run: |
+          mkdir -p _site/data
+          cp data/articles.json data/sync-status.json _site/data/
+
+      - name: Configurer GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Emballer l’application et le catalogue
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Publier le catalogue pour l’application mobile
+        id: deployment
+        uses: actions/deploy-pages@v4
