@@ -5,7 +5,7 @@ on:
     # 02:20 le samedi en Nouvelle-Calédonie, après les publications du vendredi.
     - cron: '20 2 * * 6'
       timezone: Pacific/Noumea
-  workflow_dispatch:
+  workflow_dispatch: {inputs: {refresh_all: {description: "Relire tous les articles pour récupérer les vidéos et bandes son existantes", required: false, type: boolean, default: false}}}
 
 permissions:
   contents: read
@@ -39,7 +39,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Synchroniser les articles publics
-        run: python sync.py --max-articles 300
+        run: if [[ "${{ inputs.refresh_all }}" == "true" ]]; then python sync.py --max-articles 300 --refresh-all; else python sync.py --max-articles 300; fi
 
       - name: Préparer le catalogue public pour l’application
         run: |
