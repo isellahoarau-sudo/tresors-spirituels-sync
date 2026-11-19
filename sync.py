@@ -89,9 +89,9 @@ def category_routes(urls: list[str]) -> list[str]:
     routes = []
     for url in urls:
         parts = [part for part in urlparse(url).path.split("/") if part]
-        if not (1 <= len(parts) <= 2) or any(ARTICLE_SEGMENT.match(part) for part in parts):
+        if urlparse(url).scheme != "https" or urlparse(url).netloc != "www.tresors-spirituels.net" or not parts or len(parts) > 3 or any(ARTICLE_SEGMENT.match(part) for part in parts):
             continue
-        if urlparse(url).netloc == "www.tresors-spirituels.net":
+        if any(part in LABELS for part in parts):
             routes.append(url)
     return list(dict.fromkeys(routes))
 
@@ -104,8 +104,8 @@ def article_url(url: str, base: str) -> bool:
     return (
         parsed.scheme == "https"
         and parsed.netloc == root.netloc == "www.tresors-spirituels.net"
-        and len(parts) == len(base_parts) + 1
-        and parts[:len(base_parts)] == base_parts
+        and len(parts) >= 2
+        and parts[:-1] == base_parts[:len(parts) - 1]
         and bool(ARTICLE_SEGMENT.match(parts[-1]))
     )
 
@@ -149,7 +149,7 @@ def playwright_api():
         ) from exc
 
 
-def sync_once(max_articles: int = 30) -> dict[str, Any]:
+def sync_once(max_articles: int = 300) -> dict[str, Any]:
     """Refresh listings, fetch new articles and revisit the latest cards for edits."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     old = read_json(CATALOG_PATH, {"articles": []})
@@ -178,14 +178,14 @@ def sync_once(max_articles: int = 30) -> dict[str, Any]:
 
             for route in routes:
                 try:
-                    page.goto(route, wait_until="domcontentloaded")
+                    page.goto(route, wait_until="domcontentloaded"); route = page.url.rstrip("/")
                     page.locator("main, #main-content").first.wait_for(state="attached")
                     page_count = page.locator(".jw-pagination").count()
                     total = int(page.locator(".jw-pagination").get_attribute("data-page-total") or "1") if page_count else 1
                     heading = page.locator("#main-content h1").first
                     heading_text = clean_text(heading.inner_text()) if heading.count() else ""
                     path_parts = [part for part in urlparse(route).path.split("/") if part]
-                    category = LABELS.get(path_parts[-1], heading_text or path_parts[-1].replace("-", " ").title())
+                    category = next((LABELS[part] for part in path_parts if part in LABELS), heading_text or path_parts[-1].replace("-", " ").title())
                     found = 0
                     for page_number in range(1, total + 1):
                         if page_number > 1:
@@ -232,7 +232,7 @@ def sync_once(max_articles: int = 30) -> dict[str, Any]:
             wanted = candidates[:max(1, max_articles)]
             LOG.info("Fiches à récupérer ou actualiser : %s (nouveautés détectées : %s)", len(wanted), len(new_urls))
 
-            current = dict(known)
+            current = {url: {**known[url], **listing_by_url[url], "blocks": known[url].get("blocks", [])} for url in known.keys() & listing_by_url.keys()}
             for index, url in enumerate(wanted, start=1):
                 listing = listing_by_url[url]
                 try:
@@ -297,7 +297,7 @@ def sync_once(max_articles: int = 30) -> dict[str, Any]:
             catalog = {
                 "source": ORIGIN,
                 "syncedAt": timestamp,
-                "categories": sorted({item["category"] for item in listing_by_url.values()}),
+                "categories": sorted(set(LABELS.values()), key=str.casefold),
                 "listedArticles": len(listing_by_url),
                 "storedArticles": len(ordered),
                 "articles": ordered,
@@ -369,7 +369,7 @@ def main() -> None:
     parser.add_argument("--serve", action="store_true", help="synchroniser périodiquement et servir l’aperçu local")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--interval-hours", type=float, default=6)
-    parser.add_argument("--max-articles", type=int, default=30, help="maximum de fiches complètes par cycle")
+    parser.add_argument("--max-articles", type=int, default=300, help="maximum de fiches complètes par cycle")
     args = parser.parse_args()
     if args.serve:
         serve(args.port, args.interval_hours, args.max_articles)
