@@ -246,12 +246,12 @@ def sync_once(max_articles: int = 300) -> dict[str, Any]:
                       const heading = main.querySelector('h1');
                       const published = main.innerText.match(/Publié le\\s+([^\\n]+)/i)?.[1] || '';
                       const blocks = [];
-                      for (const node of body.querySelectorAll('h2,h3,h4,p,ul,ol,blockquote,img')) {
+                      for (const node of body.querySelectorAll('h2,h3,h4,p,ul,ol,blockquote,img,video,audio,iframe,a[href]')) {
                         const tag = node.tagName.toLowerCase();
                         if (tag === 'img') {
                           const src = node.currentSrc || node.src;
                           if (src) blocks.push({type:'image', src, alt:node.alt || ''});
-                        } else if (tag === 'ul' || tag === 'ol') {
+                        } else if (tag === 'video' || tag === 'audio' || tag === 'iframe' || (tag === 'a' && /\.(mp3|m4a|aac|ogg|wav|mp4|m4v|mov|webm|m3u8)(?:[?#]|$)/i.test(node.href))) { const src = tag === 'video' || tag === 'audio' ? (node.currentSrc || node.src || node.querySelector('source')?.src || '') : (node.href || node.src || ''); const mediaType = tag === 'audio' || /\.(mp3|m4a|aac|ogg|wav)(?:[?#]|$)/i.test(src) || /soundcloud|mixcloud/i.test(src) ? 'audio' : 'video'; if (src && !blocks.some(block => block.src === src)) blocks.push({type:mediaType, src, poster:tag === 'video' ? (node.poster || '') : '', title:node.title || node.getAttribute('aria-label') || ''}); } else if (tag === 'a') { continue; } else if (tag === 'ul' || tag === 'ol') {
                           const items = [...node.querySelectorAll(':scope > li')].map(x => x.innerText.trim()).filter(Boolean);
                           if (items.length) blocks.push({type:'list', ordered:tag === 'ol', items});
                         } else {
