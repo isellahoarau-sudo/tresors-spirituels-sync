@@ -369,7 +369,7 @@ def main() -> None:
     parser.add_argument("--serve", action="store_true", help="synchroniser périodiquement et servir l’aperçu local")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--interval-hours", type=float, default=6)
-    parser.add_argument("--max-articles", type=int, default=300, help="maximum de fiches complètes par cycle"); parser.add_argument("--refresh-all", action="store_true", help="relire toutes les fiches existantes une fois"); parser.add_argument("--refresh-all", action="store_true", help="relire toutes les fiches existantes une fois")
+    parser.add_argument("--max-articles", type=int, default=300, help="maximum de fiches complètes par cycle"); parser.add_argument("--refresh-all", action="store_true", help="relire toutes les fiches existantes une fois")
     args = parser.parse_args()
     if args.serve:
         serve(args.port, args.interval_hours, args.max_articles)
