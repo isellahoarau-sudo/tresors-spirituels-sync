@@ -33,7 +33,7 @@ LABELS = {
     "tresors-de-la-bible": "Trésors de la Bible",
     "batir-sa-maison": "Bâtir sa Maison",
     "une-lettre-pour-toi": "Une lettre pour toi",
-    "citations": "Citations",
+    "citations": "Citations", "citations-courtes": "Citations courtes",
     "tu-dis-alors-je-prie": "Tu dis… alors je prie",
     "poemes": "Poèmes",
     "sources-d-inspiration": "Sources d’inspiration",
@@ -155,7 +155,7 @@ def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, A
     old = read_json(CATALOG_PATH, {"articles": []})
     known = {item.get("url"): item for item in old.get("articles", []) if item.get("url")}
     sync_playwright = playwright_api()
-    listing_by_url: dict[str, dict[str, Any]] = {}
+    listing_by_url: dict[str, dict[str, Any]] = {}; gallery_by_route: dict[str, dict[str, Any]] = {}
     category_order: list[str] = []
     errors: list[str] = []
     timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -185,8 +185,8 @@ def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, A
                     heading = page.locator("#main-content h1").first
                     heading_text = clean_text(heading.inner_text()) if heading.count() else ""
                     path_parts = [part for part in urlparse(route).path.split("/") if part]
-                    category = next((LABELS[part] for part in path_parts if part in LABELS), heading_text or path_parts[-1].replace("-", " ").title())
-                    found = 0
+                    category = next((LABELS[part] for part in reversed(path_parts) if part in LABELS), heading_text or path_parts[-1].replace("-", " ").title())
+                    found = 0; gallery = page.locator('#main-content').evaluate("""main => { const blocks=[]; const seen=new Set(); for (const img of main.querySelectorAll('img')) { const src=img.currentSrc||img.getAttribute('data-src')||img.getAttribute('data-lazy-src')||img.src||''; if(src&&!src.startsWith('data:')&&!seen.has(src)){seen.add(src);blocks.push({type:'image',src,alt:img.alt||img.closest('figure')?.querySelector('figcaption')?.innerText||''});}} for(const media of main.querySelectorAll('video,audio,iframe')) {const tag=media.tagName.toLowerCase(); const src=tag==='video'||tag==='audio'?(media.currentSrc||media.src||media.querySelector('source')?.src||''):(media.src||''); if(!src||seen.has(src))continue; seen.add(src); blocks.push({type:tag==='audio'||/soundcloud|mixcloud/i.test(src)?'audio':'video',src,poster:media.poster||'',title:media.title||media.getAttribute('aria-label')||''});} return {title:main.querySelector('h1')?.innerText.trim()||'',excerpt:main.querySelector('h2,h3')?.innerText.trim()||'',blocks};}"""); gallery_by_route[route] = {"id":"gallery-"+path_parts[-1],"url":route+"#gallery","title":gallery["title"] or category,"category":category,"categoryUrl":route,"date":"","published":"","publishedSort":"","excerpt":gallery["excerpt"] or "Galerie d’images","image":next((b["src"] for b in gallery["blocks"] if b.get("type")=="image"),""),"blocks":gallery["blocks"],"syncedAt":timestamp,"source":"Webador public gallery","isGallery":True} if gallery and gallery.get("blocks") else None
                     for page_number in range(1, total + 1):
                         if page_number > 1:
                             page.locator(f'.jw-pagination a[data-page="{page_number}"]').click()
@@ -206,7 +206,7 @@ def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, A
                         for card in cards:
                             record = extract_card(card, category, route)
                             if record:
-                                listing_by_url[record["url"]] = record
+                                listing_by_url[record["url"]] = record; gallery_by_route.pop(route, None)
                                 found += 1
                     if found:
                         category_order.append(route)
@@ -232,7 +232,7 @@ def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, A
             wanted = candidates[:max(1, max_articles)]
             LOG.info("Fiches à récupérer ou actualiser : %s (nouveautés détectées : %s)", len(wanted), len(new_urls))
 
-            current = {url: {**known[url], **listing_by_url[url], "blocks": known[url].get("blocks", [])} for url in known.keys() & listing_by_url.keys()}
+            current = {url: {**known[url], **listing_by_url[url], "blocks": known[url].get("blocks", [])} for url in known.keys() & listing_by_url.keys() if not known[url].get("isGallery")}; current.update({item["url"]: item for item in gallery_by_route.values() if item})
             for index, url in enumerate(wanted, start=1):
                 listing = listing_by_url[url]
                 try:
@@ -257,7 +257,7 @@ def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, A
                         } else {
                           const text = node.innerText.trim();
                           if (!text) continue;
-                          const type = tag === 'blockquote' ? 'quote' : (tag[0] === 'h' ? 'heading' : 'paragraph');
+                          const strongLength = [...node.querySelectorAll('strong,b')].reduce((n,el)=>n+el.innerText.trim().length,0); const type = tag === 'blockquote' ? 'quote' : (tag[0] === 'h' ? 'heading' : (tag === 'p' && strongLength >= Math.min(text.length * 0.55, 60) && text.length < 240 ? 'emphasis' : 'paragraph'));
                           blocks.push({type, level:type === 'heading' ? Number(tag.slice(1)) : 0, text});
                         }
                       }
