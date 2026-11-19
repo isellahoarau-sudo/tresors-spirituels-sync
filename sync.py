@@ -149,7 +149,7 @@ def playwright_api():
         ) from exc
 
 
-def sync_once(max_articles: int = 300) -> dict[str, Any]:
+def sync_once(max_articles: int = 300, refresh_all: bool = False) -> dict[str, Any]:
     """Refresh listings, fetch new articles and revisit the latest cards for edits."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     old = read_json(CATALOG_PATH, {"articles": []})
@@ -224,7 +224,7 @@ def sync_once(max_articles: int = 300) -> dict[str, Any]:
                 category_items = [item for item in listing_by_url.values() if item["categoryUrl"] == route]
                 category_items.sort(key=lambda item: item.get("publishedSort", ""), reverse=True)
                 refresh_urls.extend(item["url"] for item in category_items[:2])
-            candidates = list(dict.fromkeys(new_urls + refresh_urls))
+            candidates = list(dict.fromkeys(new_urls + (list(listing_by_url) if refresh_all else refresh_urls)))
             candidates.sort(
                 key=lambda url: (listing_by_url[url].get("publishedSort", ""), url in known),
                 reverse=True,
@@ -369,12 +369,12 @@ def main() -> None:
     parser.add_argument("--serve", action="store_true", help="synchroniser périodiquement et servir l’aperçu local")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--interval-hours", type=float, default=6)
-    parser.add_argument("--max-articles", type=int, default=300, help="maximum de fiches complètes par cycle")
+    parser.add_argument("--max-articles", type=int, default=300, help="maximum de fiches complètes par cycle"); parser.add_argument("--refresh-all", action="store_true", help="relire toutes les fiches existantes une fois"); parser.add_argument("--refresh-all", action="store_true", help="relire toutes les fiches existantes une fois")
     args = parser.parse_args()
     if args.serve:
         serve(args.port, args.interval_hours, args.max_articles)
     else:
-        result = sync_once(args.max_articles)
+        result = sync_once(args.max_articles, args.refresh_all)
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
