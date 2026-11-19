@@ -39,7 +39,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Synchroniser les articles publics
-        run: python sync.py --max-articles 30
+        run: python sync.py --max-articles 300
 
       - name: Préparer le catalogue public pour l’application
         run: |
